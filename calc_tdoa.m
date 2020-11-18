@@ -1,30 +1,25 @@
-function [tdoa_lags, tdoa_corr] = calc_tdoa(mic_arr, Fs)
+function [tdoa_lags, tdoa_corr] = calc_tdoa(mic_arr, Fs, sensors1, sensors2)
 % Calculate time difference of arrival between each pair of microphones
+% Format is t_sensor1 - t_sensor2
 % TODO: add upsampling?
 
+    SPD_OF_SOUND = 343; % m/s
     Ts = 1/Fs;
     narray = size(mic_arr,2);
-%     tdoa_lags = zeros(narray);
-%     tdoa_corr = zeros(narray);
-    tdoa_lags = zeros(1,(narray*(narray-1))/2);
-    tdoa_corr = zeros(1,(narray*(narray-1))/2);
+    nmeas = (narray*(narray-1))/2;
+    tdoa_lags = zeros(nmeas,1);
+    tdoa_corr = zeros(nmeas,1);
     
-    cnt = 1;
-    for i = 1:narray
-        for j = 1:i
-            [c, lags] = xcorr(mic_arr(:,j), mic_arr(:,i));
-            max_corr = max(c, [], 'all');
-            max_lag = lags(c == max_corr);
-%             tdoa_corr(i,j) = max_corr;
-%             tdoa_lags(i,j) = mean(max_lag); % TODO: fix multiple peaks, upsampling??
-            if i ~= j
-                tdoa_corr(cnt) = max_corr;
-                tdoa_lags(cnt) = mean(max_lag); % TODO: fix multiple peaks, upsampling??
-                cnt = cnt + 1;
-            end
-        end
+    for i = 1:nmeas
+        sensor1 = sensors1(i);
+        sensor2 = sensors2(i);
+        [c, lags] = xcorr(mic_arr(:,sensor1), mic_arr(:,sensor2));
+        max_corr = max(c, [], 'all');
+        max_lag = lags(c == max_corr);
+        tdoa_corr(i) = max_corr;
+        tdoa_lags(i) = mean(max_lag); % TODO: fix multiple peaks, upsampling??
     end
     
-    tdoa_lags = Ts*tdoa_lags;
+    tdoa_lags = SPD_OF_SOUND * Ts * tdoa_lags;
 end
 
