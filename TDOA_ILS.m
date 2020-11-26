@@ -1,9 +1,16 @@
-function [est_pos, P] = ILS(true_range_diff, sensors1, sensors2, pos_init)
+function [est_pos, P] = TDOA_ILS(true_range_diff, sensors1, sensors2, pos_init, flag_3d)
 % Estimate position of speaker using ILS on measured range differences
 
     % ILS
     num_meas = length(true_range_diff);
     R = eye(num_meas); % no info on measurement variance
+    
+    % handle 2D case
+    if ~flag_3d 
+        sensors1 = sensors1(1:2, :);
+        sensors2 = sensors2(1:2, :);
+        pos_init = pos_init(1:2);
+    end
     
     % loop init
     max_iter = 50;
@@ -16,24 +23,31 @@ function [est_pos, P] = ILS(true_range_diff, sensors1, sensors2, pos_init)
 
 while est_diff > est_epislon && est_diff < (10*min_diff) && iter < max_iter
     % calc dist based on curr estimate
-    est_range_diff = calc_range_diff(repmat(est_old, 1, num_meas),...
+    est_range_diff = calc_range_diff(est_old,...
                                     sensors1,...
                                     sensors2);
     % calc jacobian
-    H = Jacobian(repmat(est_old, 1, num_meas),...
-                 sensors1,...
-                 sensors2);
+    H = TDOA_Jacobian(est_old,...
+                      sensors1,...
+                      sensors2);
              
     % calc new estimate
     est_new = est_old + inv((H.')*inv(R)*H)*(H.')*inv(R)*(true_range_diff - est_range_diff);
     
     % calc estimate diff 
     est_diff = norm(est_old - est_new);
+    meas_diff = norm(true_range_diff - calc_range_diff(est_new, sensors1, sensors2));
     est_old = est_new;
     % print iter info
     iter = iter + 1;
-%     fprintf('Iter %d: x_hat = %f, y_hat = %f, z_hat = %f,\n',...
-%             iter, est_new(1), est_new(2), est_new(3));    
+    
+    if flag_3d
+        fprintf('Iter %d: x_hat = %f, y_hat = %f, z_hat = %f, err_diff = %.4f, meas_diff = %.4f\n',...
+                iter, est_new(1), est_new(2), est_new(3), est_diff, meas_diff);    
+    else
+        fprintf('Iter %d: x_hat = %f, y_hat = %f, err_diff = %.4f, meas_diff = %.4f\n',...
+        iter, est_new(1), est_new(2), est_diff, meas_diff);    
+    end
 end
 
 est_pos = est_new;         % estimated center
