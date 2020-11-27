@@ -1,7 +1,6 @@
 function [tdoa_lags, tdoa_corr] = calc_TDOA(mic_arr, Fs, sensor_pos, sensor_indices)
 % Calculate time difference of arrival between each pair of microphones
 % Format is t_sensor1 - t_sensor2
-% TODO: add upsampling?
 
     Ts = 1/Fs;
     nmeas = size(sensor_indices,2);
