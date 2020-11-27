@@ -23,7 +23,7 @@ function [est_pos, P] = TDOA_EKF(true_range_diff, sensors1, sensors2, pos_init, 
         for i = 1:num_meas
             est_range_diff = calc_range_diff(xn, sensors1(:,i), sensors2(:,i));
 
-            Hn1 =  Jacobian(xn, sensors1(:,i), sensors2(:,i));
+            Hn1 =  TDOA_Jacobian(xn, sensors1(:,i), sensors2(:,i));
             Rn1 = sigma.^2;
             Kn1 = Pn * Hn1.' * inv(Hn1 * Pn * Hn1.' + Rn1);
             xn1 = xn + Kn1 * (true_range_diff(i) - est_range_diff);

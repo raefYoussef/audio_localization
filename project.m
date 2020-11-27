@@ -4,14 +4,14 @@ clear all;
 
 %% Global Parameters
 
-SPD_OF_SOUND = 343e3;               % Speed of Sound, in mm/s
+SPD_OF_SOUND = 343;                 % Speed of Sound, in m/s
 Fs = 48000;                         % Sampling Rate, Hz
 FRAME_LEN = 1024;                   % Number of samples per capture
 AMP = 500;                          % Amplification factor
 ACTIVITY_THRESH = .4;               % Activity Threshold
 REC_LEN = 30;                       % Recording length, in seconds
 NMICS = 16;                         % Number of Microphones
-MIC_SPACING = 42;                   % Microphone spacing , in Millimeters
+MIC_SPACING =.042;                  % Microphone spacing , in Meters
 MIC_COORDINATES = MIC_SPACING * [...
                     1,0,0;...       % MC1  
                     0,0,0;...       % MC2  
@@ -30,6 +30,19 @@ MIC_COORDINATES = MIC_SPACING * [...
                     3,0,0;...       % MC15
                     2,0,0;...       % MC16
                     ].';       
+
+DOA_SENSORS = [ 
+                2,  15, 8   ;...
+                9,  8,  15  ;... 
+                2,  16, 6   ;...
+                12, 6,  16  ;...
+                1,  15, 5   ;...
+                11, 5,  15  ;...
+                4,  14, 8   ;...
+                10, 8,  14  ;...
+                3,  13, 7   ;...
+                9,  7,  13  ;...
+                ].';
 
 %% Derivative Parameters
 [SENSOR1_INDX, SENSOR2_INDX] = sensor_comp_map(NMICS); 
@@ -62,12 +75,16 @@ while toc < REC_LEN
     % measure activity
     if detect_activity(acq, ACTIVITY_THRESH)
         play(deviceWriter, acq(:,1));
-%         [tdoa, corr] = calc_tdoa(acq(:, [3 6 10 15]), Fs, SENSOR1_INDX, SENSOR2_INDX, MAX_LAGS);
-        [tdoa, corr] = calc_tdoa(acq, Fs, SENSOR1_INDX, SENSOR2_INDX, MAX_LAGS);
-        range_diff = tdoa * SPD_OF_SOUND;
-        [est_pos, P] = TDOA_ILS(range_diff, SENSOR1_POS, SENSOR2_POS, INIT_POS, false)
-%         [est_pos, P] = TDOA_ILS(range_diff, SENSOR1_POS, SENSOR2_POS, INIT_POS, true)
-%         [est_pos1, P1] = TDOA_EKF(range_diff, SENSOR1_POS, SENSOR2_POS, INIT_POS, INIT_COVAR)
-        continue
+        
+        % Calculate DOA and derive an initial estimate 
+        [doa_centers, doa_angles] = calc_DOA(acq, Fs, MIC_COORDINATES, DOA_SENSORS);
+        doa_est = Moore_Penrose(doa_centers, doa_angles);
+        
+        [tdoa, corr] = calc_TDOA(acq, Fs, MIC_COORDINATES, [SENSOR1_INDX; SENSOR2_INDX]);
+        rdoa = tdoa * SPD_OF_SOUND;
+        [est_pos, P] = TDOA_ILS(rdoa, SENSOR1_POS, SENSOR2_POS, doa_est, false);
+
+% %         [est_pos, P] = TDOA_ILS(range_diff, SENSOR1_POS, SENSOR2_POS, INIT_POS, true)
+% %         [est_pos1, P1] = TDOA_EKF(range_diff, SENSOR1_POS, SENSOR2_POS, INIT_POS, INIT_COVAR)
     end
 end
