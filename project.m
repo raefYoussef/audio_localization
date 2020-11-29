@@ -46,7 +46,7 @@ DOA_SENSORS = [
                 9,  7,  13  ;...
                 ].';
 
-DEBUG = false;
+DEBUG = true;
 
 %% Derivative Parameters
 [SENSOR1_INDX, SENSOR2_INDX] = sensor_comp_map(NMICS); 
@@ -88,7 +88,7 @@ while toc < REC_LEN
         end
         
         % Measure DOA 
-        [doa_centers, doa_angles] = calc_DOA(acq_interp, Fs_interp, MIC_COORDINATES, DOA_SENSORS);
+        [doa_centers, doa_angles] = calc_DOA(acq_interp, Fs_interp, MIC_COORDINATES, DOA_SENSORS, DEBUG);
         avg_doa = mean(doa_angles);
         
         % Derive an initial estimate based on DOA
@@ -98,8 +98,19 @@ while toc < REC_LEN
         [tdoa, corr] = calc_TDOA(acq_interp, Fs_interp, MIC_COORDINATES, [SENSOR1_INDX; SENSOR2_INDX]);
         rdoa = tdoa * SPD_OF_SOUND;
         
+        % Perform grid search (two loops with increasing resolution)
+        grid_est1 = TDOA_grid_search(SENSOR1_POS, SENSOR2_POS, rdoa,...
+                                     [0; 0], 12, .5,...
+                                     false, true);
+                                 
+        grid_est2 = TDOA_grid_search(SENSOR1_POS, SENSOR2_POS, rdoa,...
+                                     grid_est1, 3, .1,...
+                                     false, true);
+                                 
+                                 
         % Derive final estimate using ILS
-        [est_pos, P, conv_flag] = TDOA_ILS(rdoa, SENSOR1_POS, SENSOR2_POS, doa_est, false, DEBUG);
+        [est_pos1, P1, conv_flag] = TDOA_ILS(rdoa, SENSOR1_POS, SENSOR2_POS, grid_est2, false, DEBUG);
+        [est_pos2, P2, conv_flag] = TDOA_ILS(rdoa, SENSOR1_POS, SENSOR2_POS, doa_est, false, DEBUG);
 
         % Print Results
         if conv_flag

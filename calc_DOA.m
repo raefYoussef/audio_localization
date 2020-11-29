@@ -1,4 +1,4 @@
-function [center, doa] = calc_DOA(mic_arr, Fs, sensor_pos, sensor_indices)
+function [center, doa] = calc_DOA(mic_arr, Fs, sensor_pos, sensor_indices, flag_debug)
 % Given three sensors audio, compute two centers and
 % their DOA
 % Note: - the three sensors have to form two orthogonal vectors. 
@@ -74,6 +74,16 @@ function [center, doa] = calc_DOA(mic_arr, Fs, sensor_pos, sensor_indices)
         center(:,2*i)   = local_axis2(:,i) / 2 + sensor_pos(:, sensor_indices(1, i));
     end
 
+    % debugging
+    if flag_debug
+        r = 5;
+        figure();
+        
+        for i = 1:2*nmeas
+           plot([center(1,i), r*cosd(doa(i))], [center(2,i), r*sind(doa(i))], '--');
+           hold on;
+        end
+    end
 end
 
 

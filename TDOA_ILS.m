@@ -13,14 +13,15 @@ function [est_pos, P, conv_flag] = TDOA_ILS(true_range_diff, sensors1, sensors2,
     end
     
     % loop init
-    max_iter = 50;
+    max_iter = 500;
     est_epislon = 1e-6;
     est_old = pos_init;
     est_diff = 1e6;
-    min_diff = est_diff;
+    meas_diff = 1e6;
+    min_diff = 1e6;
     iter = 0;
 
-    while est_diff > est_epislon && est_diff < (10*min_diff) && iter < max_iter
+    while est_diff > est_epislon && est_diff < (1e5*min_diff) && iter < max_iter
         % calc dist based on curr estimate
         est_range_diff = calc_range_diff(est_old,...
                                         sensors1,...
