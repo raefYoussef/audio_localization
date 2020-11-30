@@ -80,7 +80,7 @@ function [center, doa] = calc_DOA(mic_arr, Fs, sensor_pos, sensor_indices, flag_
         figure();
         
         for i = 1:2*nmeas
-           plot([center(1,i), r*cosd(doa(i))], [center(2,i), r*sind(doa(i))], '--');
+           plot([center(1,i), center(1,i) + r*cosd(doa(i))], [center(2,i), center(2,i) + r*sind(doa(i))], '--');
            hold on;
         end
     end
