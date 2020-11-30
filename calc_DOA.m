@@ -1,8 +1,14 @@
 function [center, doa] = calc_DOA(mic_arr, Fs, sensor_pos, sensor_indices, flag_debug)
-% Given three sensors audio, compute two centers and
-% their DOA
-% Note: - the three sensors have to form two orthogonal vectors. 
-%       - The first index is the corner of the three sensors
+% Given eight sensors centered around point, computer DOA for each
+% center. 
+% Note: - Format
+% [s1, s5;
+%  s2, s6;
+%  s3, s7;
+%  s4, s8]
+% Where two consecutive sensors are across each other, each column forms
+% othogonal pairs, and each two consecutive columns correspond to sensors 
+% across the same center 
 
     % Constants
     SPD_OF_SOUND = 343; % m/s
@@ -12,11 +18,11 @@ function [center, doa] = calc_DOA(mic_arr, Fs, sensor_pos, sensor_indices, flag_
 
     % calc max range diff
     max_rdoa1 = vec_mag(sensor_pos(:, sensor_indices(1, :)) - sensor_pos(:, sensor_indices(2, :)));
-    max_rdoa2 = vec_mag(sensor_pos(:, sensor_indices(1, :)) - sensor_pos(:, sensor_indices(3, :)));
+    max_rdoa2 = vec_mag(sensor_pos(:, sensor_indices(3, :)) - sensor_pos(:, sensor_indices(4, :)));
     
     % calc TDOA/Range Diff
     [tdoa1, ~] = calc_TDOA(mic_arr, Fs, sensor_pos, sensor_indices([1 2], :));
-    [tdoa2, ~] = calc_TDOA(mic_arr, Fs, sensor_pos, sensor_indices([1 3], :));
+    [tdoa2, ~] = calc_TDOA(mic_arr, Fs, sensor_pos, sensor_indices([3 4], :));
     rdoa1 = tdoa1.' * SPD_OF_SOUND;
     rdoa2 = tdoa2.' * SPD_OF_SOUND;
 
@@ -34,7 +40,7 @@ function [center, doa] = calc_DOA(mic_arr, Fs, sensor_pos, sensor_indices, flag_
 
     % calculate angle difference between local and global axis (east = 0 deg)
     local_axis1 = (sensor_pos(:, sensor_indices(2, :)) - sensor_pos(:, sensor_indices(1, :)));
-    local_axis2 = (sensor_pos(:, sensor_indices(3, :)) - sensor_pos(:, sensor_indices(1, :)));
+    local_axis2 = (sensor_pos(:, sensor_indices(4, :)) - sensor_pos(:, sensor_indices(3, :)));
     local_offset1 = mod(atan2d(local_axis1(2,:), local_axis1(1,:)), 360);
     local_offset2 = mod(atan2d(local_axis2(2,:), local_axis2(1,:)), 360);
     
@@ -50,36 +56,36 @@ function [center, doa] = calc_DOA(mic_arr, Fs, sensor_pos, sensor_indices, flag_
     min_diff = angle_diff == min(angle_diff);
     
     nmeas = size(angle_diff,2);
-    center = zeros(2, 2*nmeas);
-    doa = zeros(1, 2*nmeas);
+    center = zeros(2, nmeas);
+    doa = zeros(1, nmeas);
 
     for i = 1:nmeas
         min_indx = find(min_diff(:,i), 1);
         
         if min_indx == 1
-            doa(2*i-1) = global_angle1(1,i);
-            doa(2*i)   = global_angle2(1,i);
+            doa(i) = mean([global_angle1(1,i), global_angle2(1,i)]);
         elseif min_indx == 2
-            doa(2*i-1) = global_angle1(1,i);
-            doa(2*i)   = global_angle2(2,i);
+            doa(i) = mean([global_angle1(1,i), global_angle2(2,i)]);
         elseif min_indx == 3
-            doa(2*i-1) = global_angle1(2,i);
-            doa(2*i)   = global_angle2(1,i);
+            doa(i) = mean([global_angle1(2,i), global_angle2(1,i)]);
         elseif min_indx == 4
-            doa(2*i-1) = global_angle1(2,i);
-            doa(2*i)   = global_angle2(2,i);
+            doa(i) = mean([global_angle1(2,i), global_angle2(2,i)]);
         end
 
-        center(:,2*i-1) = local_axis1(:,i) / 2 + sensor_pos(:, sensor_indices(1, i));
-        center(:,2*i)   = local_axis2(:,i) / 2 + sensor_pos(:, sensor_indices(1, i));
+        center1 = local_axis1(:,i) / 2 + sensor_pos(:, sensor_indices(1, i));
+        center2 = local_axis2(:,i) / 2 + sensor_pos(:, sensor_indices(3, i));
+        center(:,i) = mean([center1, center2],2);
     end
 
+    doa = mean(reshape(doa, 2, []));
+    center = center(:, 1:2:end);
+    
     % debugging
     if flag_debug
         r = 5;
         figure();
         
-        for i = 1:2*nmeas
+        for i = 1:(nmeas/2)
            plot([center(1,i), center(1,i) + r*cosd(doa(i))], [center(2,i), center(2,i) + r*sind(doa(i))], '--');
            hold on;
         end
