@@ -99,7 +99,7 @@ while toc < REC_LEN
         end
         
         % Measure DOA 
-        [doa_centers, doa_angles] = calc_DOA(acq_interp, Fs_interp, MIC_COORDINATES, DOA_SENSORS, DEBUG);
+        [doa_centers, doa_angles] = calc_DOA(acq_interp, Fs_interp, MIC_COORDINATES, DOA_SENSORS, true);
         avg_doa = mean(doa_angles);
         
         % Derive an initial estimate based on DOA
@@ -107,51 +107,51 @@ while toc < REC_LEN
         
         % Measure TDOA / RDOA
         [tdoa, corr] = calc_TDOA(acq_interp, Fs_interp, MIC_COORDINATES, [SENSOR1_INDX; SENSOR2_INDX]);
-        rdoa = tdoa * SPD_OF_SOUND;
+        rdoa_meas = tdoa * SPD_OF_SOUND;
         
         % Perform grid search (two loops with increasing resolution)
-        grid_est1 = TDOA_grid_search(SENSOR1_POS, SENSOR2_POS, rdoa,...
+        grid_est1 = TDOA_grid_search(SENSOR1_POS, SENSOR2_POS, rdoa_meas,...
                                      [0; 0], 12, .5,...
                                      false, DEBUG);
                                  
-        grid_est2 = TDOA_grid_search(SENSOR1_POS, SENSOR2_POS, rdoa,...
+        grid_est2 = TDOA_grid_search(SENSOR1_POS, SENSOR2_POS, rdoa_meas,...
                                      grid_est1, 3, .1,...
                                      false, DEBUG);
                                  
+        % Perform grid search on DOA estimate
+        [comb_est_l1, comb_est_l2] = TDOA_grid_search(SENSOR1_POS, SENSOR2_POS, rdoa_meas,...
+                                     doa_est, 2, .05,...
+                                     false, DEBUG);
                                  
         % Derive final estimate using ILS
-        [est_pos1, P1, conv_flag1] = TDOA_ILS(rdoa, SENSOR1_POS, SENSOR2_POS, grid_est2, false, DEBUG);
-        [est_pos2, P2, conv_flag2] = TDOA_ILS(rdoa, SENSOR1_POS, SENSOR2_POS, doa_est, false, DEBUG);
-
+        [est_pos1, P1, conv_flag1] = TDOA_ILS(rdoa_meas, SENSOR1_POS, SENSOR2_POS, doa_est, false, DEBUG);
+        [est_pos2, P2, conv_flag2] = TDOA_ILS(rdoa_meas, SENSOR1_POS, SENSOR2_POS, comb_est_l1, false, DEBUG);
+        [est_pos3, P3, conv_flag3] = TDOA_ILS(rdoa_meas, SENSOR1_POS, SENSOR2_POS, comb_est_l2, false, DEBUG);
+        
         % Print Results
-        if conv_flag1 || conv_flag2
-            fprintf('---------------------------------\n');
-            fprintf('DOA Est: (%.5f, %.5f)\n', doa_est(1), doa_est(2));
-            fprintf('Grid Est: (%.5f, %.5f)\n', grid_est2(1), grid_est2(2));
+        fprintf('---------------------------------\n');
+        fprintf('DOA Est: (%.5f, %.5f)\n', doa_est(1), doa_est(2));
+        fprintf('L1 Comb Est: (%.5f, %.5f)\n', comb_est_l1(1), comb_est_l1(2));
+        fprintf('L2 Comb Est: (%.5f, %.5f)\n', comb_est_l2(1), comb_est_l2(2));
             
-            if conv_flag1
-                fprintf('Grid Pos: (%.5f, %.5f)\n', est_pos1(1), est_pos1(2));
-            else
-                fprintf('Grid Pos: No Solution\n');
-            end
-            
-            if conv_flag1
-                fprintf('DOA Pos: (%.5f, %.5f)\n', est_pos2(1), est_pos2(2));
-            else
-                fprintf('Grid Pos: No Solution\n');
-            end
-            
-%             fprintf('Pos: \n');
-%             disp(est_pos);
-%             fprintf('Covar Matrix: \n');
-%             disp(P);
+        if conv_flag1
+            fprintf('DOA Pos: (%.5f, %.5f)\n', est_pos1(1), est_pos1(2));
         else
-%             fprintf('DOA: %.5f\n', avg_doa);
-%             fprintf('Init Pos: \n');
-%             disp(doa_est);
-            
-            fprintf('ILS did not converge\n');
+            fprintf('DOA Pos: No Solution\n');
         end
+
+        if conv_flag2
+            fprintf('L1 Comb Pos: (%.5f, %.5f)\n', est_pos2(1), est_pos2(2));
+        else
+            fprintf('L1 Comb Pos: No Solution\n');
+        end
+        
+        if conv_flag3
+            fprintf('L2 Comb Pos: (%.5f, %.5f)\n', est_pos3(1), est_pos3(2));
+        else
+            fprintf('L2 Comb Pos: No Solution\n');
+        end
+            
         
 %         [est_pos, P] = TDOA_ILS(range_diff, SENSOR1_POS, SENSOR2_POS, INIT_POS, true)
 %         [est_pos1, P1] = TDOA_EKF(range_diff, SENSOR1_POS, SENSOR2_POS, INIT_POS, INIT_COVAR)
