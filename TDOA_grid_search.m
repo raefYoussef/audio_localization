@@ -6,8 +6,9 @@ function [est_l1, est_l2] = TDOA_grid_search(sensor1_pos, sensor2_pos, rdoa_meas
     if flag_3d
         % calc grid points
         ndim = 3;
-        pts_range = range/2:step:range/2;
-        [pts_x, pts_y, pts_z] = meshgrid(center(1) + pts_range, center(2) + pts_range, center(3) + pts_range);
+        pts_range = (-range/2):step:(range/2);
+        z_range = 0:step:(range/2);
+        [pts_x, pts_y, pts_z] = meshgrid(center(1) + pts_range, center(2) + pts_range, center(3) + z_range);
         pts = [reshape(pts_x, 1, []); reshape(pts_y, 1, []); reshape(pts_z, 1, [])];
     else
         ndim = 2;
