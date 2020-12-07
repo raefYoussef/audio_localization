@@ -33,20 +33,7 @@ MIC_COORDINATES = MIC_SPACING * [...
                     2,0,0;...       % MC16
                     ].';       
 
-% DOA_SENSORS = [ 
-%                 2,  15, 8   ;...
-%                 9,  8,  15  ;... 
-%                 2,  16, 6   ;...
-%                 12, 6,  16  ;...
-%                 1,  15, 5   ;...
-%                 11, 5,  15  ;...
-%                 4,  14, 8   ;...
-%                 10, 8,  14  ;...
-%                 3,  13, 7   ;...
-%                 9,  7,  13  ;...
-%                 ].';
-
-DOA_SENSORS = [ 
+DOA_2D_SENSORS = [ 
                 4,  14, 1,  5   ;...
                 2,  12, 16, 6   ;...
                 3,  13, 16, 12  ;...
@@ -56,8 +43,15 @@ DOA_SENSORS = [
                 5,  11, 14, 10  ;...
                 3,  9,  13, 7   ;...
                 ].';
+      
+DOA_3D_SENSORS = [ 
+                4,  14, 1,  5,  2,  12, 16, 6   ;...
+                3,  13, 16, 12, 1,  11, 15, 5   ;...
+                6,  12, 3,  7,  4,  10, 14, 8   ;...
+                5,  11, 14, 10, 3,  9,  13, 7   ;...
+                ].';
             
-DEBUG = false;
+DEBUG = true;
 
 %% Derivative Parameters
 [SENSOR1_INDX, SENSOR2_INDX] = sensor_comp_map(NMICS); 
@@ -99,8 +93,7 @@ while toc < REC_LEN
         end
         
         % Measure DOA 
-        [doa_centers, doa_angles] = calc_DOA(acq_interp, Fs_interp, MIC_COORDINATES, DOA_SENSORS, true);
-        avg_doa = mean(doa_angles);
+        [doa_centers, doa_angles] = calc_3D_DOA(acq_interp, Fs_interp, MIC_COORDINATES, DOA_3D_SENSORS, true);
         
         % Derive an initial estimate based on DOA
         doa_est = Moore_Penrose(doa_centers, doa_angles);
@@ -109,47 +102,43 @@ while toc < REC_LEN
         [tdoa, corr] = calc_TDOA(acq_interp, Fs_interp, MIC_COORDINATES, [SENSOR1_INDX; SENSOR2_INDX]);
         rdoa_meas = tdoa * SPD_OF_SOUND;
         
-        % Perform grid search (two loops with increasing resolution)
-        grid_est1 = TDOA_grid_search(SENSOR1_POS, SENSOR2_POS, rdoa_meas,...
-                                     [0; 0], 12, .5,...
-                                     false, DEBUG);
+        % Perform grid search
+        [grid_est_l1, grid_est_l2] = TDOA_grid_search(SENSOR1_POS, SENSOR2_POS, rdoa_meas,...
+                             [0; 0; 0], 1, .05,...
+                             true, DEBUG);
                                  
-        grid_est2 = TDOA_grid_search(SENSOR1_POS, SENSOR2_POS, rdoa_meas,...
-                                     grid_est1, 3, .1,...
-                                     false, DEBUG);
-                                 
-        % Perform grid search on DOA estimate
-        [comb_est_l1, comb_est_l2] = TDOA_grid_search(SENSOR1_POS, SENSOR2_POS, rdoa_meas,...
-                                     doa_est, 2, .05,...
-                                     false, DEBUG);
+%         % Perform grid search on DOA estimate
+%         [comb_est_l1, comb_est_l2] = TDOA_grid_search(SENSOR1_POS, SENSOR2_POS, rdoa_meas,...
+%                                      doa_est, 2, .05,...
+%                                      false, DEBUG);
                                  
         % Derive final estimate using ILS
-        [est_pos1, P1, conv_flag1] = TDOA_ILS(rdoa_meas, SENSOR1_POS, SENSOR2_POS, doa_est, false, DEBUG);
-        [est_pos2, P2, conv_flag2] = TDOA_ILS(rdoa_meas, SENSOR1_POS, SENSOR2_POS, comb_est_l1, false, DEBUG);
-        [est_pos3, P3, conv_flag3] = TDOA_ILS(rdoa_meas, SENSOR1_POS, SENSOR2_POS, comb_est_l2, false, DEBUG);
+        [est_pos1, P1, conv_flag1] = TDOA_ILS(rdoa_meas, SENSOR1_POS, SENSOR2_POS, doa_est, true, DEBUG);
+        [est_pos2, P2, conv_flag2] = TDOA_ILS(rdoa_meas, SENSOR1_POS, SENSOR2_POS, grid_est_l1, true, DEBUG);
+        [est_pos3, P3, conv_flag3] = TDOA_ILS(rdoa_meas, SENSOR1_POS, SENSOR2_POS, grid_est_l2, true, DEBUG);
         
         % Print Results
         fprintf('---------------------------------\n');
-        fprintf('DOA Est: (%.5f, %.5f)\n', doa_est(1), doa_est(2));
-        fprintf('L1 Comb Est: (%.5f, %.5f)\n', comb_est_l1(1), comb_est_l1(2));
-        fprintf('L2 Comb Est: (%.5f, %.5f)\n', comb_est_l2(1), comb_est_l2(2));
+        fprintf('DOA Est: (%.5f, %.5f, %.5f)\n', doa_est(1), doa_est(2), doa_est(3));
+        fprintf('3D L1 Grid Est: (%.5f, %.5f, %.5f)\n', grid_est_l1(1), grid_est_l1(2), grid_est_l1(3));
+        fprintf('3D L2 Grid Est: (%.5f, %.5f, %.5f)\n', grid_est_l2(1), grid_est_l2(2), grid_est_l2(3));
             
         if conv_flag1
-            fprintf('DOA Pos: (%.5f, %.5f)\n', est_pos1(1), est_pos1(2));
+            fprintf('DOA Pos: (%.5f, %.5f, %.5f)\n', est_pos1(1), est_pos1(2), est_pos1(3));
         else
             fprintf('DOA Pos: No Solution\n');
         end
 
         if conv_flag2
-            fprintf('L1 Comb Pos: (%.5f, %.5f)\n', est_pos2(1), est_pos2(2));
+            fprintf('3D L1 Pos: (%.5f, %.5f, %.5f)\n', est_pos2(1), est_pos2(2), est_pos2(3));
         else
-            fprintf('L1 Comb Pos: No Solution\n');
+            fprintf('2D L1 Pos: No Solution\n');
         end
         
         if conv_flag3
-            fprintf('L2 Comb Pos: (%.5f, %.5f)\n', est_pos3(1), est_pos3(2));
+            fprintf('3D L2 Pos: (%.5f, %.5f, %.5f)\n', est_pos3(1), est_pos3(2), est_pos3(3));
         else
-            fprintf('L2 Comb Pos: No Solution\n');
+            fprintf('3D L2 Pos: No Solution\n');
         end
             
         
